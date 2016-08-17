@@ -85,8 +85,12 @@ def process_pack(pack_dir, server_dir, cache_dir):
 	overrides = os.listdir(pack_dir + '/overrides')
 	for override in overrides: 
 		#print(override)
-		shutil.rmtree(server_dir + '/ftb_server_pack/' + override)
-		shutil.copytree(pack_dir + '/overrides/' + override, server_dir + '/ftb_server_pack/' + override)	
+		if os.path.isdir(server_dir + '/ftb_server_pack/' + override):
+			shutil.rmtree(server_dir + '/ftb_server_pack/' + override)
+			shutil.copytree(pack_dir + '/overrides/' + override, server_dir + '/ftb_server_pack/' + override)	
+		if os.path.isfile(server_dir + '/ftb_server_pack/' + override):
+			os.remove(server_dir + '/ftb_server_pack/' + override)
+			shutil.copyfile(pack_dir + '/overrides/' + override, server_dir + '/ftb_server_pack/' + override)
 
 	for mod in mod_manifest["files"]:
 		download_mod(server_dir + '/ftb_server_pack/mods', cache_dir, mod["projectID"], mod["fileID"])
@@ -118,7 +122,7 @@ def test_server_setup(base_server_dir, pack_server_dir):
 
 	server_instance = pexpect.spawn('bash '+ base_server_dir +'/ServerStart.sh')
 	err_condition = re.compile(r'^\s+(UE|UCE|UCHE|UCHIE)\s+(.*) \[(.*)\] \((.*)\)$')
-	pass_condition = re.compile(r'Unloading dimension 1')
+	pass_condition = re.compile(r'Loading dimension 1')
 	server_pass = True
 	while not server_instance.eof():
 		line = server_instance.readline().decode('utf-8').rstrip()
@@ -129,9 +133,13 @@ def test_server_setup(base_server_dir, pack_server_dir):
 			jar_file = fail_match.group(4).rstrip()
 			sys.stdout.write('{:100s}'.format(jar_file))
 			sys.stdout.flush()
-			os.remove(base_server_dir + '/mods/' + jar_file)
-			os.remove(pack_server_dir + '/mods/'+ jar_file)
-			sys.stdout.write("\t [removed]\n")
+			try:
+				os.remove(base_server_dir + '/mods/' + jar_file)
+				os.remove(pack_server_dir + '/mods/'+ jar_file)
+			except FileNotFoundError as e:
+				sys.stdout.write("\t [failed]\n")
+			else:
+				sys.stdout.write("\t [removed]\n")
 		if pass_match:
 			server_instance.sendline('/stop')
 
